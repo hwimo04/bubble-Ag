@@ -3,18 +3,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-# 외부 호출(GAS 및 브라우저)을 위한 CORS 허용 설정
 CORS(app)
 
 def bubble_sort_trace(arr):
-    """
-    버블 정렬을 수행하면서 각 비교 및 교환 시점의 상태를 단계별로 기록합니다.
-    """
     steps = []
     data = list(arr)
     n = len(data)
     
-    # 0단계: 초기 상태 저장
     steps.append({
         "step": 0,
         "array": list(data),
@@ -24,18 +19,15 @@ def bubble_sort_trace(arr):
     })
     
     step_count = 1
-    # 외부 루프: 각 패스마다 가장 큰 원소가 맨 뒤로 이동
     for i in range(n):
         swapped_in_pass = False
         for j in range(0, n - i - 1):
             is_swap = False
-            # 인접한 두 원소 비교
             if data[j] > data[j + 1]:
                 data[j], data[j + 1] = data[j + 1], data[j]
                 is_swap = True
                 swapped_in_pass = True
             
-            # 매 비교/교환 시점의 스냅샷 생성
             steps.append({
                 "step": step_count,
                 "pass": i + 1,
@@ -47,11 +39,9 @@ def bubble_sort_trace(arr):
             })
             step_count += 1
             
-        # 패스 내에서 한 번도 교환이 발생하지 않으면 이미 정렬 완료
         if not swapped_in_pass:
             break
             
-    # 최종 완료 단계 추가
     steps.append({
         "step": step_count,
         "array": list(data),
@@ -64,11 +54,46 @@ def bubble_sort_trace(arr):
 
 @app.route('/sort', methods=['POST'])
 def handle_sort():
-    """
-    버블 정렬 실행 API 엔드포인트
-    Request Body JSON 예시: {"numbers": [64, 34, 25, 12, 22, 11, 90]}
-    """
     try:
         content = request.get_json(silent=True)
         if not content or 'numbers' not in content:
             return jsonify({
+                "status": "error",
+                "message": "JSON 형식의 'numbers' 배열 필드가 필요합니다."
+            }), 400
+            
+        numbers = content['numbers']
+        if not isinstance(numbers, list) or not all(isinstance(x, (int, float)) for x in numbers):
+            return jsonify({
+                "status": "error",
+                "message": "'numbers'는 숫자들의 배열이어야 합니다."
+            }), 400
+
+        steps, sorted_result = bubble_sort_trace(numbers)
+        
+        complexity = {
+            "time_best": "O(N)",
+            "time_average": "O(N²)",
+            "time_worst": "O(N²)",
+            "space": "O(1)"
+        }
+        
+        return jsonify({
+            "status": "success",
+            "original": numbers,
+            "sorted": sorted_result,
+            "total_steps": len(steps) - 1,
+            "complexity": complexity,
+            "steps": steps
+        }), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
